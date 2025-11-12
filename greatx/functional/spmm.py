@@ -119,7 +119,7 @@ def spmm(x: Tensor, edge_index: Union[Tensor, SparseTensor],
     elif reduce in ['min', 'max']:
         return adj.matmul(x, reduce=reduce)
     else:
-        # 对于不支持的reduce类型，回退到原实现
+        # 对于不支持的reduce类型，回退到原实现 
         x = x if x.dim() > 1 else x.unsqueeze(-1)
         out = x[row]
         if edge_weight is not None:
