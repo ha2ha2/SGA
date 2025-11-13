@@ -13,6 +13,7 @@ from .overlap import overlap
 from .progbar import Progbar
 from .scipy_sparse import scipy_normalize
 from .split_data import split_nodes, split_nodes_by_classes
+from .set_seed import set_seed
 
 classes = __all__ = [
     'Progbar',
