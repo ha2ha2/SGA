@@ -24,8 +24,8 @@ splits = split_nodes(data.y, random_state=15)
 num_features = data.x.size(-1)
 num_classes = data.y.max().item() + 1
 
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-device = torch.device('cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cpu')
 # ================================================================== #
 #                     Attack Setting                                 #
 # ================================================================== #

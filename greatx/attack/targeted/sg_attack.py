@@ -153,9 +153,11 @@ class SGAttack(TargetedAttacker, Surrogate):
 
     def get_top_attackers(self, subgraph, target, target_label,
                           best_wrong_label, num_attackers):
+        torch.cuda.reset_peak_memory_stats()
         non_edge_grad, _ = self.compute_gradients(subgraph, target,
                                                   target_label,
                                                   best_wrong_label)
+        print(torch.cuda.max_memory_allocated() / 1e9, "GB")
         _, index = torch.topk(non_edge_grad, k=min(num_attackers,           #取 "期望攻击者数量" 和 "实际候选边数量" 的较小值
                                                    non_edge_grad.size(0)),
                               sorted=False)
@@ -186,10 +188,31 @@ class SGAttack(TargetedAttacker, Surrogate):
         attacker_nodes = torch.as_tensor(attacker_nodes, dtype=torch.long,
                                          device=self.device)
         selfloop = torch.unique(torch.cat([sub_nodes, attacker_nodes])) # 为子图所有节点添加自环边
+        test_value = 33487150
+        """
+        如果边数过多，会抛出下面这个错误  33487100是本地台式机的临界值
+            return grad(loss,   # 要微分的标量张量（损失函数）
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            File "/data1/home/ha2/anaconda3/envs/SGA/lib/python3.12/site-packages/torch/autograd/__init__.py", line 412, in grad
+                result = _engine_run_backward(
+                        ^^^^^^^^^^^^^^^^^^^^^
+            File "/data1/home/ha2/anaconda3/envs/SGA/lib/python3.12/site-packages/torch/autograd/graph.py", line 744, in _engine_run_backward
+                return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            RuntimeError: CUDA error: an illegal memory access was encountered
+            CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+            For debugging consider passing CUDA_LAUNCH_BLOCKING=1.
+            Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+        """
+   
+        total = 34887070
+        perm = torch.randperm(total, device=non_edges.device)
+        selected = perm[:test_value]
         edge_index = torch.cat([
-            non_edges, sub_edges,       
-            non_edges.flip(0),      # 反向候选边
-            sub_edges.flip(0),      # 反向原始边
+            non_edges[:,:test_value], sub_edges[:,selected],       
+            non_edges.flip(0)[:,:test_value],      # 反向候选边
+            sub_edges.flip(0)[:,selected],      # 反向原始边
             selfloop.repeat((2, 1)) # 自环边
         ], dim=1)
 
@@ -201,10 +224,10 @@ class SGAttack(TargetedAttacker, Surrogate):
 
         subgraph = SubGraph(
             edge_index=edge_index,              # 包含所有边（正向+反向+自环）
-            sub_edges=sub_edges,
-            non_edges=non_edges,
-            edge_weight=edge_weight,            # 边权重为1
-            non_edge_weight=non_edge_weight,    # 边权重为0
+            sub_edges=sub_edges[:,selected],
+            non_edges=non_edges[:,:test_value],
+            edge_weight=edge_weight[:test_value],            # 边权重为1
+            non_edge_weight=non_edge_weight[:test_value],    # 边权重为0
             selfloop_weight=selfloop_weight,    # 边权重为1
         )
         return subgraph
