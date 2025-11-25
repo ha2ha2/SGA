@@ -188,7 +188,7 @@ class SGAttack(TargetedAttacker, Surrogate):
         attacker_nodes = torch.as_tensor(attacker_nodes, dtype=torch.long,
                                          device=self.device)
         selfloop = torch.unique(torch.cat([sub_nodes, attacker_nodes])) # 为子图所有节点添加自环边
-        test_value = 33487150
+        test_value = 33487110
         """
         如果边数过多，会抛出下面这个错误  33487100是本地台式机的临界值
             return grad(loss,   # 要微分的标量张量（损失函数）

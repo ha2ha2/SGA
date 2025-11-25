@@ -1,6 +1,3 @@
-# ================================================================== #
-#                     Node Classification                            #
-# ================================================================== #
 import os.path as osp
 from lrgae.dataset import load_dataset
 
@@ -15,49 +12,17 @@ from greatx.training.callbacks import ModelCheckpoint
 from greatx.utils import mark, split_nodes, set_seed
 import numpy as np
 from tqdm import tqdm
-import datetime
-import logging
-import os  
-
-
 
 set_seed(42)
-dataset = 'Photo'
-
-
-# ================================================================== #
-#                     setting log                                    #
-# ================================================================== #
-timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-current_file = os.path.basename(__file__).replace('.py', '')  # 获取当前文件名（去掉.py）
-log_filename = f'logs/{timestamp}_run_{current_file}_{dataset}.log'
-
-os.makedirs('logs', exist_ok=True)  # 新增这一行
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_filename, mode='w'),
-        logging.StreamHandler()
-    ],
-    force=True
-)
-logger = logging.getLogger()  # 新增这一行
-
-
+dataset = 'Reddit'
 root = '/data1/home/ha2/dataset/pyg_data' 
 # root = '/root/autodl-tmp/dataset/pyg_data'
-logger.info(GraphDataset.available_datasets())
-transform = T.ToUndirected()
-# ================================================================== #
-#                               Load dataset                         #
-"""
-For the Cora, CiteSeer, and PubMed datasets, is utilized as the publicly
-For the remaining datasets, follow the recommended 8:1:1 train/validation/test random splits
-"""
-# ================================================================== #
+print(GraphDataset.available_datasets())
+transform=T.LargestConnectedComponents()
 data = load_dataset(root, dataset, transform=transform)
-logger.info(data)
+print(data)
+
+splits = split_nodes(data.y, random_state=15)
 
 num_features = data.x.size(-1)
 num_classes = data.y.max().item() + 1
@@ -65,36 +30,35 @@ num_classes = data.y.max().item() + 1
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # ================================================================== #
-#      Train SGC, K default 2, training epochs, by default 100       #
+#                     Attack Setting                                 #
 # ================================================================== #
-SGC_model = Trainer(SGC(num_features, num_classes), device=device, lr=0.1,
+targets = splits.test_nodes[torch.randperm(len(splits.test_nodes))[:1000]]
+print(f"Randomly Selected {len(targets)} target nodes from test set")
+
+# ================================================================== #
+#                      Before Attack                                 #
+# ================================================================== #
+surrogate_model = Trainer(SGC(num_features, num_classes), device=device, lr=0.1,
                          weight_decay=1e-5)
-ckp = ModelCheckpoint(f'SGC_{dataset}.pth', monitor='val_acc')
-SGC_model.fit(data, mask=(data.train_mask, data.val_mask),
+ckp = ModelCheckpoint('surrogate_model.pth', monitor='val_acc')
+surrogate_model.fit(data, mask=(splits.train_nodes, splits.val_nodes),
                    callbacks=[ckp])
-torch.save(SGC_model.model.state_dict(), f'./models_weights/SGC_{dataset}.pth')
-logger.info(f'Testing SGC on {dataset}.....')
-test_res = SGC_model.test_step(data, mask=data.test_mask)
-logger.info(test_res)
+torch.save(surrogate_model.model.state_dict(), './models_weights/SGC.pth')
+print('On Local Surrogate Model.....')
+print('Testing.....')
+test_res = surrogate_model.test_step(data, mask=splits.test_nodes)
+print(test_res)
 
-
-# ================================================================== #
-#             Train GCN, training epochs, by default 100             #
-#                  dh = 128 for Photo and Computer                   #
-# ================================================================== #
-
-GCN_model = Trainer(GCN(num_features, num_classes, hids=[128, 128], acts='relu'), device=device, lr=0.01,
-                         weight_decay=5e-4)
-ckp1 = ModelCheckpoint(f'GCN_{dataset}.pth', monitor='val_acc')
-GCN_model.fit(data, mask=(data.train_mask, data.val_mask),
+target_model = Trainer(GCN(num_features, num_classes), device=device, lr=0.1,
+                         weight_decay=1e-5)
+ckp1 = ModelCheckpoint('target_model.pth', monitor='val_acc')
+target_model.fit(data, mask=(splits.train_nodes, splits.val_nodes),
                    callbacks=[ckp1])
-torch.save(GCN_model.model.state_dict(), f'./models_weights/GCN_{dataset}.pth')
-logger.info(f'Testing GCN on {dataset}.....')
-test_res = GCN_model.test_step(data, mask=data.test_mask)
-logger.info(test_res)
-
-
-
+torch.save(target_model.model.state_dict(), './models_weights/GCN.pth')
+print('On Remote TARGET model.....')
+print('Testing.....')
+test_res = target_model.test_step(data, mask=splits.test_nodes)
+print(test_res)
 
 
 

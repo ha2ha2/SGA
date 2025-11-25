@@ -117,7 +117,8 @@ def train_val_test_split_tabular(N: int, *,
                                  val: float = 0.1,
                                  stratify: Optional[bool] = None,
                                  random_state: Optional[int] = None) -> Tuple:
-
+    # unique_classes, class_counts = torch.unique(stratify, return_counts=True)
+    # print("类别分布:", dict(zip(unique_classes.tolist(), class_counts.tolist())))
     idx = torch.arange(N)
     idx_train, idx_test = train_test_split(idx,
                                            random_state=random_state,

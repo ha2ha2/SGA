@@ -10,6 +10,7 @@ from greatx.nn.models import SGC, GCN
 from greatx.training import Trainer
 from greatx.training.callbacks import ModelCheckpoint
 from greatx.utils import mark, split_nodes
+
 # torch.cuda.set_device(0)
 dataset = 'Reddit'
 root = '/data1/home/ha2/dataset/pyg_data' 
